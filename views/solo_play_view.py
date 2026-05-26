@@ -32,71 +32,7 @@ class SoloPlayView(arcade.View):
         self.is_game = True
         self.is_pause = False
 
-        self.manager = UIManager()
-        self.game_over_manager = UIManager()
-        self.pause_manager = UIManager()
-
-        self.manager.enable()
-        self.anchor_layout = UIAnchorLayout()
-
-        self.box_layout = UIBoxLayout(vertical=False, space_between=30)
-
-        button = UITextureButton(width=80, height=80,
-                                 texture=self.pause_button,
-                                 texture_hovered=self.pause_button_hover,
-                                 texture_pressed=self.pause_button_hover)
-
-        button.on_click = self.on_pause_click
-        self.box_layout.add(button)
-
-        self.anchor_layout.add(self.box_layout, anchor_x='left', anchor_y='top', align_x=30, align_y=-20)
-        self.manager.add(self.anchor_layout)
-
-        self.game_over_anchor_layout = UIAnchorLayout()
-        self.game_over_box_layout = UIBoxLayout()
-        button = UITextureButton(width=140, height=140,
-                                 texture=self.restart_button,
-                                 texture_hovered=self.restart_button_hover,
-                                 texture_pressed=self.restart_button_hover)
-
-        button.on_click = self.restart
-        self.game_over_box_layout.add(button)
-        self.game_over_anchor_layout.add(self.game_over_box_layout, anchor_x='left', anchor_y='top', align_x=357, align_y=-330)
-        self.game_over_manager.add(self.game_over_anchor_layout)
-
-
-        self.pause_anchor_layout = UIAnchorLayout()
-        self.pause_box_layout = UIBoxLayout(vertical=False, space_between=60)
-        self.pause_box_layout_leave = UIBoxLayout(vertical=False, space_between=60)
-
-        button = UITextureButton(width=140, height=140,
-                                 texture=self.restart_button,
-                                 texture_hovered=self.restart_button_hover,
-                                 texture_pressed=self.restart_button_hover)
-
-        button.on_click = self.restart
-
-        button1 = UITextureButton(width=140, height=140,
-                                 texture=self.continue_button,
-                                 texture_hovered=self.continue_button_hover,
-                                 texture_pressed=self.continue_button_hover)
-
-        button1.on_click = self.continue_game
-
-        button2 = UITextureButton(width=140, height=140,
-                                  texture=self.leave_button,
-                                  texture_hovered=self.leave_button_hover,
-                                  texture_pressed=self.leave_button_hover)
-
-        button2.on_click = self.leave_to_menu
-
-        self.pause_box_layout.add(button1)
-        self.pause_box_layout.add(button)
-        self.pause_box_layout_leave.add(button2)
-
-        self.pause_anchor_layout.add(self.pause_box_layout, anchor_x='left', anchor_y='top', align_x=127, align_y=-330)
-        self.pause_anchor_layout.add(self.pause_box_layout_leave, anchor_x='left', anchor_y='top', align_x=227, align_y=-130)
-        self.pause_manager.add(self.pause_anchor_layout)
+        self.setup_ui()
 
         self.player = Player(300, 240)
         self.players = arcade.SpriteList()
@@ -263,9 +199,10 @@ class SoloPlayView(arcade.View):
                         self.is_game = False
 
     def on_pause_click(self, event):
+        if not self.is_game:
+            return
         self.is_pause = True
         self.manager.disable()
-        self.game_over_manager.disable()
         self.pause_manager.enable()
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
@@ -277,6 +214,10 @@ class SoloPlayView(arcade.View):
         self.keys_pressed.remove(symbol)
 
     def restart(self, event):
+        self.game_over_manager.disable()
+        self.pause_manager.disable()
+        self.manager.enable()
+
         self.countdown_timer = Timer(3)
         self.go_to_color_timer = Timer(2)
         self.is_game = True
@@ -287,10 +228,6 @@ class SoloPlayView(arcade.View):
         self.player = Player(300, 240)
         self.players = arcade.SpriteList()
         self.players.append(self.player)
-
-        self.game_over_manager.disable()
-        self.pause_manager.disable()
-        self.manager.enable()
 
     def continue_game(self, event):
         self.is_pause = False
@@ -303,3 +240,104 @@ class SoloPlayView(arcade.View):
         from views.menu_view import MenuView
         menu_view = MenuView()
         self.window.show_view(menu_view)
+
+    def on_mouse_motion(self, x: int, y: int, dx: int, dy: int):
+        if self.pause_manager.enabled:
+            self.pause_manager.on_mouse_motion(x, y, dx, dy)
+        elif self.game_over_manager.enabled:
+            self.game_over_manager.on_mouse_motion(x, y, dx, dy)
+        elif self.manager.enabled:
+            self.manager.on_mouse_motion(x, y, dx, dy)
+
+    def on_mouse_press(self, x: int, y: int, button: int, modifiers: int):
+        if self.pause_manager.enabled:
+            self.pause_manager.on_mouse_press(x, y, button, modifiers)
+        elif self.game_over_manager.enabled:
+            self.game_over_manager.on_mouse_press(x, y, button, modifiers)
+        elif self.manager.enabled:
+            self.manager.on_mouse_press(x, y, button, modifiers)
+
+    def on_mouse_release(self, x: int, y: int, button: int, modifiers: int):
+        if self.pause_manager.enabled:
+            self.pause_manager.on_mouse_release(x, y, button, modifiers)
+        elif self.game_over_manager.enabled:
+            self.game_over_manager.on_mouse_release(x, y, button, modifiers)
+        elif self.manager.enabled:
+            self.manager.on_mouse_release(x, y, button, modifiers)
+
+    def on_show_view(self):
+        self.manager = UIManager(self.window)
+        self.game_over_manager = UIManager(self.window)
+        self.pause_manager = UIManager(self.window)
+
+        self.setup_ui()
+
+        self.manager.enable()
+
+    def setup_ui(self):
+        self.manager = UIManager(self.window)
+        self.game_over_manager = UIManager(self.window)
+        self.pause_manager = UIManager(self.window)
+
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+
+        self.box_layout = UIBoxLayout(vertical=False, space_between=30)
+
+        button = UITextureButton(width=80, height=80,
+                                 texture=self.pause_button,
+                                 texture_hovered=self.pause_button_hover,
+                                 texture_pressed=self.pause_button_hover)
+
+        button.on_click = self.on_pause_click
+        self.box_layout.add(button)
+
+        self.anchor_layout.add(self.box_layout, anchor_x='left', anchor_y='top', align_x=30, align_y=-20)
+        self.manager.add(self.anchor_layout)
+
+        self.game_over_anchor_layout = UIAnchorLayout()
+        self.game_over_box_layout = UIBoxLayout()
+        button = UITextureButton(width=140, height=140,
+                                 texture=self.restart_button,
+                                 texture_hovered=self.restart_button_hover,
+                                 texture_pressed=self.restart_button_hover)
+
+        button.on_click = self.restart
+        self.game_over_box_layout.add(button)
+        self.game_over_anchor_layout.add(self.game_over_box_layout, anchor_x='left', anchor_y='top', align_x=357,
+                                         align_y=-330)
+        self.game_over_manager.add(self.game_over_anchor_layout)
+
+        self.pause_anchor_layout = UIAnchorLayout()
+        self.pause_box_layout = UIBoxLayout(vertical=False, space_between=60)
+        self.pause_box_layout_leave = UIBoxLayout(vertical=False, space_between=60)
+
+        button = UITextureButton(width=140, height=140,
+                                 texture=self.restart_button,
+                                 texture_hovered=self.restart_button_hover,
+                                 texture_pressed=self.restart_button_hover)
+
+        button.on_click = self.restart
+
+        button1 = UITextureButton(width=140, height=140,
+                                  texture=self.continue_button,
+                                  texture_hovered=self.continue_button_hover,
+                                  texture_pressed=self.continue_button_hover)
+
+        button1.on_click = self.continue_game
+
+        button2 = UITextureButton(width=140, height=140,
+                                  texture=self.leave_button,
+                                  texture_hovered=self.leave_button_hover,
+                                  texture_pressed=self.leave_button_hover)
+
+        button2.on_click = self.leave_to_menu
+
+        self.pause_box_layout.add(button1)
+        self.pause_box_layout.add(button)
+        self.pause_box_layout_leave.add(button2)
+
+        self.pause_anchor_layout.add(self.pause_box_layout, anchor_x='left', anchor_y='top', align_x=127, align_y=-330)
+        self.pause_anchor_layout.add(self.pause_box_layout_leave, anchor_x='left', anchor_y='top', align_x=227,
+                                     align_y=-130)
+        self.pause_manager.add(self.pause_anchor_layout)
