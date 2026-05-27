@@ -1,3 +1,4 @@
+import json
 import random
 import arcade
 from arcade.gui import UIManager, UITextureButton
@@ -31,8 +32,7 @@ class SoloPlayView(arcade.View):
         self.score_text = str(self.score)
         self.is_game = True
         self.is_pause = False
-
-        self.setup_ui()
+        self.active_ui = 'main'
 
         self.player = Player(300, 240)
         self.players = arcade.SpriteList()
@@ -45,10 +45,10 @@ class SoloPlayView(arcade.View):
 
         self.color_to_stay = None
 
-    def generate_back_pattern(self):
+    @staticmethod
+    def generate_back_pattern():
         rows = 10
         cols = 8
-        total_cells = rows * cols
         target = {c: 11 for c in colors}
         extra_colors = random.sample(colors, 3)
         for c in extra_colors:
@@ -158,6 +158,13 @@ class SoloPlayView(arcade.View):
             self.pause_manager.draw()
 
     def on_update(self, delta_time: float) -> bool | None:
+        if self.active_ui == 'pause':
+            self.pause_manager.on_update(delta_time)
+        elif self.active_ui == 'game_over':
+            self.game_over_manager.on_update(delta_time)
+        else:
+            self.manager.on_update(delta_time)
+
         if self.is_game and not self.is_pause:
             self.countdown_timer.update(delta_time)
             vel_x, vel_y = 0, 0
@@ -176,6 +183,8 @@ class SoloPlayView(arcade.View):
                 vel_y *= factor
 
             self.player.move(vel_x, vel_y)
+            self.player.center_x = max(25, min(self.player.center_x, 575))
+            self.player.center_y = max(25, min(self.player.center_y, 455))
 
             if self.countdown_timer.check()[0]:
                 self.back_pattern = self.generate_back_pattern()
@@ -194,9 +203,20 @@ class SoloPlayView(arcade.View):
                         self.go_to_color_timer.reset()
                         self.go_to_color_timer.change_time(self.go_to_color_timer.time * 0.99)
                     else:
+                        with open('user_state.json', 'r') as f:
+                            file = json.load(f)
+
+                        solo_highest_score = file['solo_highest_score']
+
+                        if self.score > solo_highest_score:
+                            file['solo_highest_score'] = self.score
+
+                        json.dump(file, open('user_state.json', 'w'))
+
                         self.manager.disable()
                         self.game_over_manager.enable()
                         self.is_game = False
+                        self.active_ui = 'game_over'
 
     def on_pause_click(self, event):
         if not self.is_game:
@@ -204,6 +224,7 @@ class SoloPlayView(arcade.View):
         self.is_pause = True
         self.manager.disable()
         self.pause_manager.enable()
+        self.active_ui = 'pause'
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         self.keys_pressed.append(symbol)
@@ -217,6 +238,7 @@ class SoloPlayView(arcade.View):
         self.game_over_manager.disable()
         self.pause_manager.disable()
         self.manager.enable()
+        self.active_ui = 'main'
 
         self.countdown_timer = Timer(3)
         self.go_to_color_timer = Timer(2)
@@ -231,10 +253,10 @@ class SoloPlayView(arcade.View):
 
     def continue_game(self, event):
         self.is_pause = False
-
         self.pause_manager.disable()
         self.game_over_manager.disable()
         self.manager.enable()
+        self.active_ui = 'main'
 
     def leave_to_menu(self, event):
         from views.menu_view import MenuView
@@ -242,27 +264,27 @@ class SoloPlayView(arcade.View):
         self.window.show_view(menu_view)
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int):
-        if self.pause_manager.enabled:
+        if self.active_ui == 'pause':
             self.pause_manager.on_mouse_motion(x, y, dx, dy)
-        elif self.game_over_manager.enabled:
+        elif self.active_ui == 'game_over':
             self.game_over_manager.on_mouse_motion(x, y, dx, dy)
-        elif self.manager.enabled:
+        elif self.active_ui == 'main':
             self.manager.on_mouse_motion(x, y, dx, dy)
 
     def on_mouse_press(self, x: int, y: int, button: int, modifiers: int):
-        if self.pause_manager.enabled:
+        if self.active_ui == 'pause':
             self.pause_manager.on_mouse_press(x, y, button, modifiers)
-        elif self.game_over_manager.enabled:
+        elif self.active_ui == 'game_over':
             self.game_over_manager.on_mouse_press(x, y, button, modifiers)
-        elif self.manager.enabled:
+        elif self.active_ui == 'main':
             self.manager.on_mouse_press(x, y, button, modifiers)
 
     def on_mouse_release(self, x: int, y: int, button: int, modifiers: int):
-        if self.pause_manager.enabled:
+        if self.active_ui == 'pause':
             self.pause_manager.on_mouse_release(x, y, button, modifiers)
-        elif self.game_over_manager.enabled:
+        elif self.active_ui == 'game_over':
             self.game_over_manager.on_mouse_release(x, y, button, modifiers)
-        elif self.manager.enabled:
+        elif self.active_ui == 'main':
             self.manager.on_mouse_release(x, y, button, modifiers)
 
     def on_show_view(self):
@@ -275,11 +297,6 @@ class SoloPlayView(arcade.View):
         self.manager.enable()
 
     def setup_ui(self):
-        self.manager = UIManager(self.window)
-        self.game_over_manager = UIManager(self.window)
-        self.pause_manager = UIManager(self.window)
-
-        self.manager.enable()
         self.anchor_layout = UIAnchorLayout()
 
         self.box_layout = UIBoxLayout(vertical=False, space_between=30)

@@ -4,6 +4,8 @@ from arcade.gui import UIManager, UITextureButton
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 from constants import BLUE, BLACK, BROWN, RED, PURPLE, YELLOW, GREEN
 from views.solo_play_view import SoloPlayView
+from views.profile_view import ProfileView
+from views.lobbies_view import LobbiesView
 
 colors = [BLUE, BLACK, BROWN, RED, PURPLE, YELLOW, GREEN]
 
@@ -16,24 +18,46 @@ class MenuView(arcade.View):
         self.logo = arcade.load_texture('images/logo.png')
         self.solo_play_button = arcade.load_texture('images/solo_play_button.png')
         self.solo_play_button_hover = arcade.load_texture('images/solo_play_button_hover.png')
+        self.profile_button = arcade.load_texture("images/profile_button.png")
+        self.profile_button_hover = arcade.load_texture("images/profile_button_hover.png")
+        self.multiplayer_button = arcade.load_texture("images/multiplayer_button.png")
+        self.multiplayer_button_hover = arcade.load_texture("images/multiplayer_button_hover.png")
 
         self.manager = UIManager()
         self.manager.enable()
         self.anchor_layout = UIAnchorLayout()
         self.box_layout = UIBoxLayout(vertical=True, space_between=30)
+        self.right_layout = UIBoxLayout(vertical=True, space_between=30)
 
-        button = UITextureButton(width=315, height=100,
+        solo_play_button = UITextureButton(width=315, height=100,
                                   texture=self.solo_play_button,
                                   texture_hovered=self.solo_play_button_hover,
                                   texture_pressed=self.solo_play_button_hover)
 
-        button.on_click = self.on_solo_play_click
-        self.box_layout.add(button)
+        solo_play_button.on_click = self.on_solo_play_click
+        multiplayer_button = UITextureButton(width=310, height=100,
+                                           texture=self.multiplayer_button,
+                                           texture_hovered=self.multiplayer_button_hover,
+                                           texture_pressed=self.multiplayer_button_hover)
+
+        multiplayer_button.on_click = self.on_multiplayer_click
+        self.box_layout.add(solo_play_button)
+        self.box_layout.add(multiplayer_button)
+
+        profile_button = UITextureButton(width=120, height=120,
+                                         texture=self.profile_button,
+                                         texture_hovered=self.profile_button_hover,
+                                         texture_pressed=self.profile_button_hover
+                                         )
+        profile_button.on_click = self.on_profile_click
+        self.right_layout.add(profile_button)
 
         self.anchor_layout.add(self.box_layout, anchor_y='top', align_y=-360)
+        self.anchor_layout.add(self.right_layout, anchor_x='right', anchor_y='top', align_x=-20, align_y=-400)
         self.manager.add(self.anchor_layout)
 
-    def generate_back_pattern(self):
+    @staticmethod
+    def generate_back_pattern():
         target = {c: 14 for c in colors}
         extra_colors = random.sample(colors, 2)
         for c in extra_colors:
@@ -116,3 +140,11 @@ class MenuView(arcade.View):
     def on_solo_play_click(self, event):
         solo_play_view = SoloPlayView()
         self.window.show_view(solo_play_view)
+
+    def on_multiplayer_click(self, event):
+        multiplayer_view = LobbiesView()
+        self.window.show_view(multiplayer_view)
+
+    def on_profile_click(self, event):
+        profile_view = ProfileView()
+        self.window.show_view(profile_view)
