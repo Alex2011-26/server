@@ -17,7 +17,7 @@ class Timer:
         self.reset_time = new_time
 
 
-class TimerList():
+class TimerList:
     def __init__(self):
         self.timers = []
 

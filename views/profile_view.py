@@ -1,10 +1,10 @@
-import random
 import json
 import arcade
 from arcade.color import ORANGE
 from arcade.gui import UIManager, UITextureButton, UIInputText
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 from constants import BLUE, BLACK, BROWN, RED, PURPLE, YELLOW, GREEN
+from models.time_message import TimeMessage, TimeMessageList
 
 colors = [BLUE, BLACK, BROWN, RED, PURPLE, YELLOW, GREEN]
 
@@ -34,6 +34,8 @@ class ProfileView(arcade.View):
 
         self.user_solo_highest_score_text = arcade.Text(str(self.user_solo_highest_score), 250, 297, BLUE, 30)
 
+        self.time_message_list = TimeMessageList()
+
     def on_draw(self) -> bool | None:
         self.clear()
         scale = 1
@@ -41,9 +43,10 @@ class ProfileView(arcade.View):
         self.manager.draw()
         self.user_name_text.draw()
         self.user_solo_highest_score_text.draw()
+        self.time_message_list.draw()
 
     def on_update(self, delta_time: float) -> bool | None:
-        pass
+        self.time_message_list.update(delta_time)
 
     def on_back_click(self, event):
         from views.menu_view import MenuView
@@ -98,5 +101,5 @@ class ProfileView(arcade.View):
             self.user_name_text.x = 300 - self.user_name_text.content_width // 2
 
         else:
-            self.change_name_input.text = f'4 <= {len(name)} <= 9 !'
+            self.time_message_list.append(TimeMessage('Длина имени от 4 до 9 символов'))
 

@@ -10,7 +10,6 @@ class Game(arcade.Window):
         self.show_view(menu_view)
         pass
 
-
     def on_update(self, delta_time: float) -> bool | None:
         pass
 
