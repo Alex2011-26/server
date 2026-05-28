@@ -10,9 +10,11 @@ colors = [BLUE, BLACK, BROWN, RED, PURPLE, YELLOW, GREEN]
 
 
 class MultiplayerView(arcade.View):
-    def __init__(self, room_id=None):
+    def __init__(self, client, room_id, players):
         super().__init__()
-        pass
+        self.client = client
+        self.room_id = room_id
+        self.players = players
 
     def on_draw(self) -> bool | None:
         self.clear()
