@@ -1,6 +1,6 @@
 import json
 import arcade
-from arcade.gui import UIManager, UITextureButton
+from arcade.gui import UIManager, UITextureButton, UILabel
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 from arcade.gui.experimental import UIScrollArea
 from arcade.gui.experimental.scroll_area import UIScrollBar
@@ -16,6 +16,7 @@ class LobbiesView(arcade.View):
         self.back_to_menu_button = arcade.load_texture('images/back_to_menu_button_multiplayer.png')
         self.back_to_menu_button_hover = arcade.load_texture('images/back_to_menu_button_multiplayer_hover.png')
         self.lobby_card = arcade.load_texture('images/lobby_card.png')
+        self.lobby_card_hover = arcade.load_texture('images/lobby_card_hover.png')
 
         self.client = AsyncWebSocketClient('ws://localhost:8765')
         self.client.start()
@@ -59,6 +60,14 @@ class LobbiesView(arcade.View):
             elif t == 'room_removed':
                 self.rooms = [r for r in self.rooms if r['room_id'] != msg['room_id']]
                 self.populate_room_cards()
+            elif t == 'room_updated':
+                for room in self.rooms:
+                    if room['room_id'] == msg['room_id']:
+                        room['players'] = msg['players']
+                        break
+                self.populate_room_cards()
+            elif t == 'player_joined':
+                print(f"Player joined room {msg['room_id']}: {msg['count']} players")
 
     def setup_ui(self):
         root = UIAnchorLayout()
@@ -86,14 +95,37 @@ class LobbiesView(arcade.View):
 
     def populate_room_cards(self):
         self.room_list_layout.clear()
+
+        def make_handler(rid):
+            def handler(event):
+                room = next((r for r in self.rooms if r['room_id'] == rid), None)
+                if room and room['players'] >= 2:
+                    print(f"Комната {rid} уже заполнена")
+                    return
+                print(f"Clicked room: {rid}")
+                self.join_room_click(rid)
+
+            return handler
+
         for room in self.rooms:
             room_id = room['room_id']
             players = room['players']
             card_btn = UITextureButton(
                 width=600, height=150,
                 texture=self.lobby_card,
-                text=f"{room_id}  ({players}/2)"
+                texture_pressed=self.lobby_card_hover,
             )
+            card_btn.on_click = make_handler(room_id)
+
+            inner_root = UIAnchorLayout()
+            box = UIBoxLayout(vertical=False, space_between=30)
+            label_id = UILabel(text=f'{room_id}', text_color=arcade.color.WHITE, font_size=30)
+            label_players = UILabel(f'{players}/2', text_color=arcade.color.GREEN if players < 2 else arcade.color.RED,
+                                    font_size=40)
+            box.add(label_id)
+            box.add(label_players)
+            inner_root.add(box, anchor_x='right', anchor_y='center', align_x=-60)
+            card_btn.add(inner_root)
             self.room_list_layout.add(card_btn)
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -116,7 +148,11 @@ class LobbiesView(arcade.View):
 
     def on_create_lobby_click(self, event):
         from views.lobby_view import LobbyView
-        self.window.show_view(LobbyView())
+        self.window.show_view(LobbyView(room_id=None))
+
+    def join_room_click(self, room_id):
+        from views.lobby_view import LobbyView
+        self.window.show_view(LobbyView(room_id=room_id))
 
     def on_back_to_menu_click(self, event):
         from views.menu_view import MenuView

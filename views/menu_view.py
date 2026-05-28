@@ -138,13 +138,16 @@ class MenuView(arcade.View):
             self.back_pattern = self.generate_back_pattern()
 
     def on_solo_play_click(self, event):
+        self.manager.disable()
         solo_play_view = SoloPlayView()
         self.window.show_view(solo_play_view)
 
     def on_multiplayer_click(self, event):
+        self.manager.disable()
         multiplayer_view = LobbiesView()
         self.window.show_view(multiplayer_view)
 
     def on_profile_click(self, event):
+        self.manager.disable()
         profile_view = ProfileView()
         self.window.show_view(profile_view)

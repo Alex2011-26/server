@@ -23,6 +23,7 @@ async def handler(websocket):
                 rooms[room_id] = {websocket}
                 socket_to_room[websocket] = room_id
                 await websocket.send(json.dumps({'type': 'room_created', 'room_id': room_id}))
+                # Оповещаем всех о новой комнате
                 for client in all_clients:
                     await client.send(json.dumps({'type': 'room_added', 'room_id': room_id, 'players': 1}))
 
@@ -32,7 +33,9 @@ async def handler(websocket):
                     rooms[room_id].add(websocket)
                     socket_to_room[websocket] = room_id
                     for ws in rooms[room_id]:
-                        await ws.send(json.dumps({'type': 'player_joined', 'count': len(rooms[room_id])}))
+                        await ws.send(json.dumps({'type': 'player_joined', 'count': len(rooms[room_id]), 'room_id': room_id}))
+                    for client in all_clients:
+                        await client.send(json.dumps({'type': 'room_updated', 'room_id': room_id, 'players': len(rooms[room_id])}))
                 else:
                     await websocket.send(json.dumps({'type': 'error', 'message': 'Room not found or full'}))
 
@@ -56,9 +59,14 @@ async def handler(websocket):
                 room_id = socket_to_room.pop(websocket, None)
                 if room_id and room_id in rooms:
                     rooms[room_id].discard(websocket)
-                    for ws in rooms[room_id]:
-                        await ws.send(json.dumps({'type': 'player_left'}))
-                    if not rooms[room_id]:
+                    if rooms[room_id]:
+                        # Комната ещё существует – обновляем количество
+                        for ws in rooms[room_id]:
+                            await ws.send(json.dumps({'type': 'player_left'}))
+                        for client in all_clients:
+                            await client.send(json.dumps({'type': 'room_updated', 'room_id': room_id, 'players': len(rooms[room_id])}))
+                    else:
+                        # Комната опустела – удаляем
                         del rooms[room_id]
                         for client in all_clients:
                             await client.send(json.dumps({'type': 'room_removed', 'room_id': room_id}))
@@ -67,9 +75,10 @@ async def handler(websocket):
         room_id = socket_to_room.pop(websocket, None)
         if room_id and room_id in rooms:
             rooms[room_id].discard(websocket)
-            for ws in rooms[room_id]:
-                await ws.send(json.dumps({'type': 'player_left'}))
-            if not rooms[room_id]:
+            if rooms[room_id]:
+                for client in all_clients:
+                    await client.send(json.dumps({'type': 'room_updated', 'room_id': room_id, 'players': len(rooms[room_id])}))
+            else:
                 del rooms[room_id]
                 for client in all_clients:
                     await client.send(json.dumps({'type': 'room_removed', 'room_id': room_id}))
