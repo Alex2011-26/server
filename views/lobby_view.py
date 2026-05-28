@@ -75,7 +75,7 @@ class LobbyView(arcade.View):
             elif t == 'game_message':
                 print("Соперник:", msg['data'])
             elif t == 'error':
-                print("Ошибка:", msg.get('message'))
+                self.time_messages.append(TimeMessage(str(msg.get('message'))))
 
     def update_player_texts(self):
         if len(self.players) >= 1:
@@ -89,7 +89,7 @@ class LobbyView(arcade.View):
             leader_mark = ' (Leader)' if p2.get('leader') else ''
             self.second_player_text.text = f"{p2['name']}{leader_mark}"
         else:
-            self.second_player_text.text = 'Waiting for opponent...'
+            self.second_player_text.text = 'Ждём соперника...'
 
     def on_draw(self):
         self.clear()

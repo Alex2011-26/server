@@ -69,4 +69,4 @@ class AsyncWebSocketClient:
 
     def close(self):
         """Корректно закрыть соединение и остановить поток."""
-        self.outgoing.put(None) 
+        self.outgoing.put(None)
