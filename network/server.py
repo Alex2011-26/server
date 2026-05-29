@@ -95,6 +95,15 @@ async def handler(websocket):
                             if ws != websocket:
                                 await ws.send(json.dumps({'type': 'game_message', 'data': data.get('data')}))
 
+            elif action == 'send_position':
+                room_data = socket_to_room.get(websocket)
+                if room_data:
+                    room_id = room_data['room_id']
+                    if room_id in rooms:
+                        for ws in rooms[room_id]:
+                            if ws != websocket:
+                                await ws.send(json.dumps({'type': 'opponent_position', 'position': data.get('position')}))
+
             elif action == 'get_rooms':
                 rooms_info = []
                 for room_id, members in rooms.items():
@@ -133,6 +142,42 @@ async def handler(websocket):
                             del rooms[room_id]
                             for client in all_clients:
                                 await client.send(json.dumps({'type': 'room_removed', 'room_id': room_id}))
+
+            elif action == 'leave_game':
+                room_data = socket_to_room.get(websocket)
+                if room_data:
+                    room_id = room_data["room_id"]
+                    if room_id in rooms:
+                        if room_data.get("leader"):
+                            for ws in rooms[room_id]:
+                                await ws.send(json.dumps({'type': 'return_to_menu'}))
+                            for ws in rooms[room_id]:
+                                socket_to_room.pop(ws, None)
+                            del rooms[room_id]
+                            for client in all_clients:
+                                await client.send(json.dumps({'type': 'room_removed', 'room_id': room_id}))
+                        else:
+                            rooms[room_id].discard(websocket)
+                            socket_to_room.pop(websocket, None)
+                            await websocket.send(json.dumps({'type': 'return_to_menu'}))
+                            players_left = []
+                            for ws in rooms[room_id]:
+                                info = socket_to_room.get(ws, {})
+                                players_left.append({
+                                    "name": info.get("name", "Unknown"),
+                                    "leader": info.get("leader", False)
+                                })
+                            for ws in rooms[room_id]:
+                                await ws.send(json.dumps({
+                                    'type': 'player_left',
+                                    'players': players_left
+                                }))
+                            for client in all_clients:
+                                await client.send(json.dumps({
+                                    'type': 'room_updated',
+                                    'room_id': room_id,
+                                    'players': len(rooms[room_id])
+                                }))
     finally:
         all_clients.discard(websocket)
         room_data = socket_to_room.pop(websocket, None)

@@ -148,10 +148,12 @@ class LobbiesView(arcade.View):
 
     def on_create_lobby_click(self, event):
         from views.lobby_view import LobbyView
+        self.manager.disable()
         self.window.show_view(LobbyView(room_id=None))
 
     def join_room_click(self, room_id):
         from views.lobby_view import LobbyView
+        self.manager.disable()
         self.window.show_view(LobbyView(room_id=room_id))
 
     def on_back_to_menu_click(self, event):

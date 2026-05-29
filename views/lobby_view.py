@@ -7,15 +7,19 @@ from network.client import AsyncWebSocketClient
 from models.time_message import TimeMessage, TimeMessageList
 
 class LobbyView(arcade.View):
-    def __init__(self, room_id=None):
+    def __init__(self, room_id=None, client: AsyncWebSocketClient = None,
+                 players=None, leader=None):
         super().__init__()
         arcade.set_background_color((150, 49, 150))
-        self.client = AsyncWebSocketClient('ws://localhost:8765')
-        self.client.start()
+        self.client = AsyncWebSocketClient('ws://localhost:8765') if client is None else client
+        if client is None:
+            self.client.start()
         self.room_id = room_id
-        self.joined = False
-        self.players = []
-        self.leaving_to_game = False       # флаг, чтобы не рвать соединение при старте
+        self.players = players if players else []
+        self.leader = leader if leader is not None else (room_id is None)
+        self.already_in_room = client is not None and room_id is not None and players is not None
+        self.joined = self.already_in_room
+        self.leaving_to_game = False
 
         self.start_button = arcade.load_texture('images/start_button.png')
         self.start_button_hover = arcade.load_texture('images/start_button_hover.png')
@@ -43,11 +47,16 @@ class LobbyView(arcade.View):
             return 'Unknown'
 
     def on_show_view(self):
+        if self.already_in_room:
+            self.update_player_texts()
+            return
         player_name = self.get_player_name()
         if self.room_id is None:
             self.client.send({'action': 'create_room', 'player_name': player_name})
+            self.leader = True
         else:
             self.client.send({'action': 'join_room', 'room_id': self.room_id, 'player_name': player_name})
+            self.leader = False
         self.client.send({'action': 'get_rooms'})
 
     def on_update(self, delta_time):
@@ -70,7 +79,7 @@ class LobbyView(arcade.View):
             elif t == 'game_started':
                 self.leaving_to_game = True
                 from views.multiplayer_view import MultiplayerView
-                multiplayer_view = MultiplayerView(self.client, self.room_id, self.players)
+                multiplayer_view = MultiplayerView(self.client, self.room_id, self.players, self.leader)
                 self.window.show_view(multiplayer_view)
             elif t == 'game_message':
                 print("Соперник:", msg['data'])
@@ -130,6 +139,8 @@ class LobbyView(arcade.View):
         self.client.send({'action': 'start_game'})
 
     def on_back_click(self, event):
+        self.client.send({'action': 'leave_room'})
+        self.client.close()
         from views.lobbies_view import LobbiesView
         self.window.show_view(LobbiesView())
 
