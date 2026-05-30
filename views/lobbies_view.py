@@ -107,7 +107,8 @@ class LobbiesView(arcade.View):
 
             return handler
 
-        for room in self.rooms:
+        for room in sorted(self.rooms, key=lambda r: r['players'], reverse=False):
+            print(self.rooms)
             room_id = room['room_id']
             players = room['players']
             card_btn = UITextureButton(

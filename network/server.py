@@ -80,20 +80,27 @@ async def handler(websocket):
                     room_id = room_data["room_id"]
                     if len(rooms[room_id]) == 2:
                         for ws in rooms[room_id]:
-                            await ws.send(json.dumps({'type': 'game_started'}))
+                            is_leader = socket_to_room[ws].get("leader", False)
+                            await ws.send(json.dumps({
+                                'type': 'game_started',
+                                'leader': is_leader
+                            }))
                     else:
                         await websocket.send(json.dumps({'type': 'error', 'message': 'Need 2 players to start'}))
                 else:
                     await websocket.send(json.dumps({'type': 'error', 'message': 'Only leader can start the game'}))
 
-            elif action == 'message':
+            elif action == 'sync_field':
                 room_data = socket_to_room.get(websocket)
-                if room_data:
+                if room_data and room_data["room_id"] in rooms:
                     room_id = room_data["room_id"]
-                    if room_id in rooms:
-                        for ws in rooms[room_id]:
-                            if ws != websocket:
-                                await ws.send(json.dumps({'type': 'game_message', 'data': data.get('data')}))
+                    for ws in rooms[room_id]:
+                        if ws != websocket:
+                            await ws.send(json.dumps({
+                                'type': 'field_update',
+                                'back_pattern': data['back_pattern'],
+                                'color_to_stay': data['color_to_stay']
+                            }))
 
             elif action == 'send_position':
                 room_data = socket_to_room.get(websocket)
@@ -103,6 +110,22 @@ async def handler(websocket):
                         for ws in rooms[room_id]:
                             if ws != websocket:
                                 await ws.send(json.dumps({'type': 'opponent_position', 'position': data.get('position')}))
+
+            elif action == 'game_over':
+                room_data = socket_to_room.get(websocket)
+                if room_data and room_data["room_id"] in rooms:
+                    room_id = room_data["room_id"]
+                    for ws in rooms[room_id]:
+                        await ws.send(json.dumps({'type': 'return_to_lobby'}))
+
+            elif action == 'message':
+                room_data = socket_to_room.get(websocket)
+                if room_data:
+                    room_id = room_data["room_id"]
+                    if room_id in rooms:
+                        for ws in rooms[room_id]:
+                            if ws != websocket:
+                                await ws.send(json.dumps({'type': 'game_message', 'data': data.get('data')}))
 
             elif action == 'get_rooms':
                 rooms_info = []

@@ -33,6 +33,7 @@ class ProfileView(arcade.View):
         self.user_name_text.x = 300 - self.user_name_text.content_width // 2
 
         self.user_solo_highest_score_text = arcade.Text(str(self.user_solo_highest_score), 250, 297, BLUE, 30)
+        self.user_multiplayer_highest_score_text = arcade.Text(str(self.user_multiplayer_highest_score), 260, 207, BLUE, 30)
 
         self.time_message_list = TimeMessageList()
 
@@ -43,6 +44,7 @@ class ProfileView(arcade.View):
         self.manager.draw()
         self.user_name_text.draw()
         self.user_solo_highest_score_text.draw()
+        self.user_multiplayer_highest_score_text.draw()
         self.time_message_list.draw()
 
     def on_update(self, delta_time: float) -> bool | None:
