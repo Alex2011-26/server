@@ -201,6 +201,25 @@ async def handler(websocket):
                                     'room_id': room_id,
                                     'players': len(rooms[room_id])
                                 }))
+
+            elif action == 'check_colors':
+                room_data = socket_to_room.get(websocket)
+                if room_data:
+                    room_id = room_data["room_id"]
+                    if room_id in rooms:
+                        for ws in rooms[room_id]:
+                            await ws.send(json.dumps({'type': 'checking_colors'}))
+
+
+            elif action == 'send_colors':
+                room_data = socket_to_room.get(websocket)
+                if room_data:
+                    room_id = room_data["room_id"]
+                    if room_id in rooms:
+                        for ws in rooms[room_id]:
+                            if ws != websocket:
+                                await ws.send(json.dumps({'type': 'sent_color', 'color': data['color']}))
+
     finally:
         all_clients.discard(websocket)
         room_data = socket_to_room.pop(websocket, None)

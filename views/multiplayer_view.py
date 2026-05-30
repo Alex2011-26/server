@@ -41,6 +41,10 @@ class MultiplayerView(arcade.View):
         self.setup_ui()
         self.manager.enable()
 
+        self.color = None
+        self.opponent_color = None
+        self.waiting_for_colors = False
+
     def on_show_view(self):
         if self.leader:
             self.back_pattern = self.generate_back_pattern()
@@ -136,6 +140,7 @@ class MultiplayerView(arcade.View):
                 self.color_to_stay = msg['color_to_stay']
                 self.countdown_timer.reset()
                 self.go_to_color_timer.reset()
+                self.waiting_for_colors = False
             elif t == 'return_to_lobby':
                 from views.lobby_view import LobbyView
                 lobby_view = LobbyView(client=self.client, room_id=self.room_id,
@@ -156,6 +161,18 @@ class MultiplayerView(arcade.View):
                     from views.menu_view import MenuView
                     self.window.show_view(MenuView())
                 return
+            elif t == 'checking_colors':
+                x = self.player.center_x // 60 - 1 if self.player.center_x % 60 == 0 else self.player.center_x // 60
+                y = self.player.center_y // 60 - 1 if self.player.center_y % 60 == 0 else self.player.center_y // 60
+                color = self.back_pattern[int(x)][int(y)]
+                if not self.leader:
+                    self.client.send({'action': 'send_colors', 'color': color})
+                else:
+                    self.color = color
+
+            if self.leader and self.waiting_for_colors:
+                if t == 'sent_color':
+                    self.opponent_color = msg['color']
 
         if not self.is_game:
             return
@@ -164,8 +181,31 @@ class MultiplayerView(arcade.View):
             return
 
         if self.leader:
-            self.countdown_timer.update(delta_time)
-            if self.countdown_timer.check()[0]:
+            if self.color is None or self.opponent_color is None:
+                self.countdown_timer.update(delta_time)
+                if self.countdown_timer.check()[0]:
+                    self.back_pattern = self.generate_back_pattern()
+                    self.color_to_stay = random.choice(colors)
+                    self.client.send({
+                        'action': 'sync_field',
+                        'back_pattern': self.back_pattern,
+                        'color_to_stay': self.color_to_stay
+                    })
+                    self.waiting_for_colors = False
+                else:
+                    if self.go_to_color_timer.check()[0]:
+                        self.go_to_color_timer.update(delta_time)
+                    else:
+                        if not self.waiting_for_colors:
+                            self.client.send({'action': 'check_colors'})
+                            self.waiting_for_colors = True
+            else:
+                print(f"Colors: me={self.color}, opponent={self.opponent_color}, target={self.color_to_stay}")
+                self.color = None
+                self.opponent_color = None
+                self.waiting_for_colors = False
+                self.countdown_timer.reset()
+                self.go_to_color_timer.reset()
                 self.back_pattern = self.generate_back_pattern()
                 self.color_to_stay = random.choice(colors)
                 self.client.send({
@@ -173,11 +213,6 @@ class MultiplayerView(arcade.View):
                     'back_pattern': self.back_pattern,
                     'color_to_stay': self.color_to_stay
                 })
-            else:
-                if self.go_to_color_timer.check()[0]:
-                    self.go_to_color_timer.update(delta_time)
-                else:
-                    self.check_player_color()
 
         self.client.send({
             'action': 'send_position',
@@ -207,12 +242,10 @@ class MultiplayerView(arcade.View):
         if 0 <= y < len(self.back_pattern) and 0 <= x < len(self.back_pattern[0]):
             color = self.back_pattern[y][x]
             if color == self.color_to_stay:
-                print(color, self.color_to_stay)
                 self.countdown_timer.reset()
                 self.go_to_color_timer.reset()
                 self.go_to_color_timer.change_time(self.go_to_color_timer.time * 0.99)
             else:
-                print(color, self.color_to_stay)
                 self.client.send({'action': 'game_over'})
                 self.is_game = False
 
