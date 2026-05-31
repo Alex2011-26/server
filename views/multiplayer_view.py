@@ -44,6 +44,11 @@ class MultiplayerView(arcade.View):
         self.color = None
         self.opponent_color = None
         self.waiting_for_colors = False
+        self.return_to_lobby = False
+        self.return_to_lobby_timer = Timer(2)
+
+        self.leader_state = None
+        self.player_state = None
 
     def on_show_view(self):
         if self.leader:
@@ -116,18 +121,21 @@ class MultiplayerView(arcade.View):
         return grid
 
     def on_draw(self):
-        self.clear()
-        if self.back_pattern:
-            for ind_x, row in enumerate(self.back_pattern):
-                for ind_y, color in enumerate(row):
-                    arcade.draw_lbwh_rectangle_filled(60 * ind_x, 60 * ind_y, 60, 60, color)
-        scale = 1
-        arcade.draw_texture_rect(self.solo_play_bar, arcade.rect.XYWH(300, 540, 600 * scale, 120 * scale))
-        if self.color_to_stay:
-            arcade.draw_lbwh_rectangle_filled(280, 520, 40, 40, self.color_to_stay)
-            arcade.draw_lbwh_rectangle_outline(278, 518, 42, 42, arcade.color.BLACK, 4)
-        self.manager.draw()
-        self.player_list.draw()
+        if not self.return_to_lobby:
+            self.clear()
+            if self.back_pattern:
+                for ind_x, row in enumerate(self.back_pattern):
+                    for ind_y, color in enumerate(row):
+                        arcade.draw_lbwh_rectangle_filled(60 * ind_x, 60 * ind_y, 60, 60, color)
+            scale = 1
+            arcade.draw_texture_rect(self.solo_play_bar, arcade.rect.XYWH(300, 540, 600 * scale, 120 * scale))
+            if self.color_to_stay:
+                arcade.draw_lbwh_rectangle_filled(280, 520, 40, 40, self.color_to_stay)
+                arcade.draw_lbwh_rectangle_outline(278, 518, 42, 42, arcade.color.BLACK, 4)
+            self.manager.draw()
+            self.player_list.draw()
+        else:
+            arcade.draw_lbwh_rectangle_filled(0, 0, 600, 600, (0, 0, 0, 0.1))
 
     def on_update(self, delta_time):
         for msg in self.client.get_messages():
@@ -135,18 +143,24 @@ class MultiplayerView(arcade.View):
             if t == 'opponent_position':
                 self.opponent_player.center_x = msg['position']['x']
                 self.opponent_player.center_y = msg['position']['y']
-            elif t == 'field_update':
-                self.back_pattern = msg['back_pattern']
-                self.color_to_stay = msg['color_to_stay']
-                self.countdown_timer.reset()
-                self.go_to_color_timer.reset()
-                self.waiting_for_colors = False
             elif t == 'return_to_lobby':
+                if self.leader:
+                    print(msg.get('leader_state'))
+                else:
+                    print(msg.get('player_state'))
+                self.return_to_lobby = True
                 from views.lobby_view import LobbyView
                 lobby_view = LobbyView(client=self.client, room_id=self.room_id,
                                        players=self.player_info, leader=self.leader)
                 self.window.show_view(lobby_view)
                 return
+            elif t == 'field_update':
+                if not self.return_to_lobby:
+                    self.back_pattern = msg['back_pattern']
+                    self.color_to_stay = msg['color_to_stay']
+                    self.countdown_timer.reset()
+                    self.go_to_color_timer.reset()
+                    self.waiting_for_colors = False
             elif t == 'return_to_menu':
                 from views.menu_view import MenuView
                 self.window.show_view(MenuView())
@@ -174,16 +188,45 @@ class MultiplayerView(arcade.View):
                 if t == 'sent_color':
                     self.opponent_color = msg['color']
 
-        if not self.is_game:
-            return
+        if not self.return_to_lobby:
+            if not self.is_game:
+                return
 
-        if not self.back_pattern:
-            return
+            if not self.back_pattern:
+                return
 
-        if self.leader:
-            if self.color is None or self.opponent_color is None:
-                self.countdown_timer.update(delta_time)
-                if self.countdown_timer.check()[0]:
+            if self.leader:
+                if self.color is None or self.opponent_color is None:
+                    self.countdown_timer.update(delta_time)
+                    if self.countdown_timer.check()[0]:
+                        self.back_pattern = self.generate_back_pattern()
+                        self.color_to_stay = random.choice(colors)
+                        self.client.send({
+                            'action': 'sync_field',
+                            'back_pattern': self.back_pattern,
+                            'color_to_stay': self.color_to_stay
+                        })
+                        self.waiting_for_colors = False
+                    else:
+                        if self.go_to_color_timer.check()[0]:
+                            self.go_to_color_timer.update(delta_time)
+                        else:
+                            if not self.waiting_for_colors:
+                                self.client.send({'action': 'check_colors'})
+                                self.waiting_for_colors = True
+                else:
+                    self.leader_state = self.color == self.color_to_stay
+                    self.player_state = tuple(self.opponent_color) == self.color_to_stay
+                    print(
+                        f"Colors: me={self.color}, opponent={tuple(self.opponent_color)}, target={self.color_to_stay}, {self.leader_state}, {self.player_state}")
+                    if not self.leader_state or not self.player_state:
+                        self.return_to_lobby = True
+
+                    self.color = None
+                    self.opponent_color = None
+                    self.waiting_for_colors = False
+                    self.countdown_timer.reset()
+                    self.go_to_color_timer.reset()
                     self.back_pattern = self.generate_back_pattern()
                     self.color_to_stay = random.choice(colors)
                     self.client.send({
@@ -191,63 +234,34 @@ class MultiplayerView(arcade.View):
                         'back_pattern': self.back_pattern,
                         'color_to_stay': self.color_to_stay
                     })
-                    self.waiting_for_colors = False
-                else:
-                    if self.go_to_color_timer.check()[0]:
-                        self.go_to_color_timer.update(delta_time)
-                    else:
-                        if not self.waiting_for_colors:
-                            self.client.send({'action': 'check_colors'})
-                            self.waiting_for_colors = True
-            else:
-                print(f"Colors: me={self.color}, opponent={self.opponent_color}, target={self.color_to_stay}")
-                self.color = None
-                self.opponent_color = None
-                self.waiting_for_colors = False
-                self.countdown_timer.reset()
-                self.go_to_color_timer.reset()
-                self.back_pattern = self.generate_back_pattern()
-                self.color_to_stay = random.choice(colors)
-                self.client.send({
-                    'action': 'sync_field',
-                    'back_pattern': self.back_pattern,
-                    'color_to_stay': self.color_to_stay
-                })
 
-        self.client.send({
-            'action': 'send_position',
-            'position': {'x': self.player.center_x, 'y': self.player.center_y}
-        })
+            self.client.send({
+                'action': 'send_position',
+                'position': {'x': self.player.center_x, 'y': self.player.center_y}
+            })
 
-        vel_x, vel_y = 0.0, 0.0
-        if arcade.key.W in self.keys_pressed or arcade.key.UP in self.keys_pressed:
-            vel_y += self.player.speed * delta_time
-        if arcade.key.A in self.keys_pressed or arcade.key.LEFT in self.keys_pressed:
-            vel_x -= self.player.speed * delta_time
-        if arcade.key.D in self.keys_pressed or arcade.key.RIGHT in self.keys_pressed:
-            vel_x += self.player.speed * delta_time
-        if arcade.key.S in self.keys_pressed or arcade.key.DOWN in self.keys_pressed:
-            vel_y -= self.player.speed * delta_time
-        if vel_x != 0 and vel_y != 0:
-            factor = 0.7071
-            vel_x *= factor
-            vel_y *= factor
-        self.player.move(vel_x, vel_y)
-        self.player.center_x = max(25, min(self.player.center_x, 575))
-        self.player.center_y = max(25, min(self.player.center_y, 455))
-
-    def check_player_color(self):
-        x = int(self.player.center_x // 60)
-        y = int(self.player.center_y // 60)
-        if 0 <= y < len(self.back_pattern) and 0 <= x < len(self.back_pattern[0]):
-            color = self.back_pattern[y][x]
-            if color == self.color_to_stay:
-                self.countdown_timer.reset()
-                self.go_to_color_timer.reset()
-                self.go_to_color_timer.change_time(self.go_to_color_timer.time * 0.99)
-            else:
-                self.client.send({'action': 'game_over'})
-                self.is_game = False
+            vel_x, vel_y = 0.0, 0.0
+            if arcade.key.W in self.keys_pressed or arcade.key.UP in self.keys_pressed:
+                vel_y += self.player.speed * delta_time
+            if arcade.key.A in self.keys_pressed or arcade.key.LEFT in self.keys_pressed:
+                vel_x -= self.player.speed * delta_time
+            if arcade.key.D in self.keys_pressed or arcade.key.RIGHT in self.keys_pressed:
+                vel_x += self.player.speed * delta_time
+            if arcade.key.S in self.keys_pressed or arcade.key.DOWN in self.keys_pressed:
+                vel_y -= self.player.speed * delta_time
+            if vel_x != 0 and vel_y != 0:
+                factor = 0.7071
+                vel_x *= factor
+                vel_y *= factor
+            self.player.move(vel_x, vel_y)
+            self.player.center_x = max(25, min(self.player.center_x, 575))
+            self.player.center_y = max(25, min(self.player.center_y, 455))
+        else:
+            self.return_to_lobby_timer.update(delta_time)
+            if not self.return_to_lobby_timer.check()[0]:
+                self.client.send({'action': 'game_over',
+                                  'leader_state': self.leader_state,
+                                  'player_state': self.player_state})
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         self.keys_pressed.append(symbol)

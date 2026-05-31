@@ -113,10 +113,14 @@ async def handler(websocket):
 
             elif action == 'game_over':
                 room_data = socket_to_room.get(websocket)
+                leader_state = data.get('leader_state', None)
+                player_state = data.get('player_state', None)
                 if room_data and room_data["room_id"] in rooms:
                     room_id = room_data["room_id"]
                     for ws in rooms[room_id]:
-                        await ws.send(json.dumps({'type': 'return_to_lobby'}))
+                        await ws.send(json.dumps({'type': 'return_to_lobby',
+                                                  'leader_state': leader_state,
+                                                  'player_state': player_state}))
 
             elif action == 'message':
                 room_data = socket_to_room.get(websocket)
@@ -209,7 +213,6 @@ async def handler(websocket):
                     if room_id in rooms:
                         for ws in rooms[room_id]:
                             await ws.send(json.dumps({'type': 'checking_colors'}))
-
 
             elif action == 'send_colors':
                 room_data = socket_to_room.get(websocket)
